@@ -934,11 +934,11 @@ class TestPipelineRun():
         flexmock(Openshift).should_receive('watch_resource').replace_with(custom_watch)
         task_runs = [task_run for task_run in pipeline_run.wait_for_taskruns()]
 
-        assert task_runs == [
+        assert task_runs == [[
             (PIPELINE_RUN_JSON['status']['taskRuns'][TASK_RUN_NAME]['pipelineTaskName'],
              TASK_RUN_NAME),
             (PIPELINE_RUN_JSON['status']['taskRuns'][TASK_RUN_NAME2]['pipelineTaskName'],
-             TASK_RUN_NAME2)]
+             TASK_RUN_NAME2)]]
 
     @responses.activate
     @pytest.mark.parametrize(('get_json', 'empty_logs'), [
@@ -1029,11 +1029,11 @@ class TestPipelineRun():
                          [TASK_RUN_NAME]['pipelineTaskName'],
                          'Hello World'),
                         (PIPELINE_RUN_JSON['status']['taskRuns']
-                         [TASK_RUN_NAME]['pipelineTaskName'],
-                         'Bye World'),
-                        (PIPELINE_RUN_JSON['status']['taskRuns']
                          [TASK_RUN_NAME2]['pipelineTaskName'],
                          '2Hello World'),
+                        (PIPELINE_RUN_JSON['status']['taskRuns']
+                         [TASK_RUN_NAME]['pipelineTaskName'],
+                         'Bye World'),
                         (PIPELINE_RUN_JSON['status']['taskRuns']
                          [TASK_RUN_NAME2]['pipelineTaskName'],
                          '2'),
