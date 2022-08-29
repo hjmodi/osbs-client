@@ -14,6 +14,9 @@ import pkg_resources
 
 import sys
 import argparse
+
+from coverage.annotate import os
+
 from osbs import set_logging
 from osbs.api import OSBS
 from osbs.conf import Configuration
@@ -34,24 +37,60 @@ def _print_pipeline_run_logs(pipeline_run, user_warnings_store):
                    False when reading logs fails or is not iterable
     """
     pipeline_run_name = pipeline_run.pipeline_run_name
-
+    logs_dir = '/home/hmodi/test/'
+    logfiles = {'noarch': open(os.path.join(logs_dir, 'osbs-build.log'),
+                               'wb')}
     pipeline_run_logs = pipeline_run.get_logs(follow=True, wait=True)
     if not isinstance(pipeline_run_logs, collections.abc.Iterable):
         logger.error("'%s' is not iterable; can't display logs", pipeline_run_name)
         return False
     print(f"Pipeline run created ({pipeline_run_name}), watching logs (feel free to interrupt)")
-    try:
-        for _, line in pipeline_run_logs:
-            if user_warnings_store.is_user_warning(line):
-                user_warnings_store.store(line)
+    user_warnings = UserWarningsStore()
+    final_platforms = ['x86_64', 'ppc64le', 's390x']
+    platforms = ['x86_64', 'ppc64le', 's390x']
+
+    for task_run_name, line in pipeline_run_logs:
+
+        if user_warnings.is_user_warning(line):
+            user_warnings.store(line)
+            continue
+
+        if platforms:
+            task_platform = next(
+                (platform for platform in platforms if
+                 platform.replace('_', '-') in task_run_name),
+                'noarch'
+            )
+        else:
+            task_platform = 'noarch'
+
+        if task_platform not in logfiles:
+            if task_platform != 'noarch' and not final_platforms:
+
+                if not final_platforms:
+                    final_platforms = platforms
+
+            if (task_platform != 'noarch') and (task_platform not in final_platforms):
                 continue
 
-            print('{!r}'.format(line))
-        return True
-    except Exception as ex:
-        logger.error("Error during fetching logs for pipeline run %s: %s",
-                     pipeline_run_name, repr(ex))
-        return False
+            if task_platform != 'noarch':
+                logfiles['noarch'].write(bytearray(f'{task_platform} build has started. '
+                                                   'Check platform specific logs\n', 'utf-8'))
+
+            log_filename = f'{task_platform}.log'
+            logfiles[task_platform] = open(os.path.join(logs_dir, log_filename),
+                                           'wb')
+
+        outfile = logfiles[task_platform]
+
+        try:
+            outfile.write(("%s\n" % line).encode('utf-8'))
+            outfile.flush()
+        except Exception as error:
+            msg = "Exception (%s) while writing build logs: %s" % (type(error), error)
+
+    for logfile in logfiles.values():
+        logfile.close()
 
 
 def _get_build_metadata(pipeline_run, user_warnings_store):
